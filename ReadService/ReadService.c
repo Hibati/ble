@@ -3,7 +3,14 @@
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
+#include <string.h>
+#include <stdlib.h>
+#include <stdarg.h>
+#include <errno.h>
+#include <stdio.h>
 
+#include <signal.h>
+#include <sys/signalfd.h>
 #include <errno.h>
 #include <glib.h>
 #include <stdlib.h>
@@ -24,8 +31,8 @@
 #include <gatt/gattrib.h>
 #include <gatt/btio.h>
 static char *opt_src = "00:1A:7D:DA:71:13";
-static char *opt_dst = "EE:52:F8:A2:89:1B";
-//static char *opt_dst = "D8:AD:4A:AA:42:B5";
+//static char *opt_dst = "EE:2A:81:DE:72:6A";
+static char *opt_dst = "D8:AD:4A:AA:42:B5";
 static char *opt_dst_type = NULL;
 //static char *opt_value = NULL;
 static char *opt_sec_level = NULL;
@@ -46,6 +53,7 @@ static gboolean opt_listen = FALSE;
 static GMainLoop *event_loop;
 static gboolean got_error = FALSE;
 static GSourceFunc operation;
+//static GAttrib *attrib = NULL;
 static void events_handler(const uint8_t *pdu, uint16_t len, gpointer user_data)
 {
 	GAttrib *attrib = user_data;
@@ -92,40 +100,92 @@ static gboolean listen_start(gpointer user_data)
 
 	return FALSE;
 }
+static void primary_all_cb(GSList *services, guint8 status, gpointer user_data)
+{
+	GSList *l;
+printf("good\n");
+	
 
+	for (l = services; l; l = l->next) {
+		struct gatt_primary *prim = l->data;
+		g_print("attr handle = 0x%04x, end grp handle = 0x%04x "
+			"uuid: %s\n", prim->range.start, prim->range.end, prim->uuid);
+	}
+}
+static gboolean primary(gpointer user_data)
+{
+	int i;
+GAttrib *attrib = user_data;
+printf("attr=%d\n",attrib);
+
+  
+  i= gatt_discover_primary(attrib, NULL, primary_all_cb, NULL);
+  
+  printf("i=%d",i);
+
+
+}
 static void connect_cb(GIOChannel *io, GError *err, gpointer user_data)
 {
+		
+	printf("ddd\n");
 	GAttrib *attrib;
 
-	if (err) {
-		g_printerr("%s\n", err->message);
-		got_error = TRUE;
-		g_main_loop_quit(event_loop);
-	}
-
 	attrib = g_attrib_new(io);
-
-	if (opt_listen)
-		g_idle_add(listen_start, attrib);
-
-	operation(attrib);
+		
+		
+	printf("ddd\n");
+	primary(attrib);
 }
+
+
+
+
+
 int main()
 
 {
-	GIOChannel *chan;
+	system("hciconfig hcio down");	
+	system("hciconfig hcio up");
+	//GOptionContext *context;
+	
+	
+	GIOChannel *chan ;
+	bdaddr_t sba, dba;
+	uint8_t dest_type;
+	GError *tmp_err = NULL;
+	BtIOSecLevel sec;
 	GError *gerr = NULL;
 	opt_dst_type = g_strdup("random");
 	opt_sec_level = g_strdup("low");
-	chan = gatt_connect(opt_src, opt_dst, opt_dst_type, opt_sec_level,
-				opt_psm, opt_mtu, connect_cb, &gerr);
+	//operation = primary;
+	str2ba(opt_src, &sba);
+	dest_type = BDADDR_LE_RANDOM;
+	str2ba(opt_dst, &dba);
+	sec = BT_IO_SEC_LOW;
+	printf("connect\n");
+	chan = bt_io_connect(NULL, NULL, NULL, &tmp_err,
+					BT_IO_OPT_SOURCE_BDADDR, &sba,
+					BT_IO_OPT_SOURCE_TYPE, BDADDR_LE_PUBLIC,
+					BT_IO_OPT_DEST_BDADDR, &dba,
+					BT_IO_OPT_DEST_TYPE, dest_type,
+					BT_IO_OPT_CID, ATT_CID,
+					BT_IO_OPT_SEC_LEVEL, sec,
+					BT_IO_OPT_INVALID);
 
-	printf("p=%d\n",chan);
+	
+
+	
+	connect_cb(chan,gerr,0);
+	printf("chan=%d\n",chan);
+	//gatt_discover_primary(attrib, NULL, primary_all_cb, NULL);
 	//primary();
-	//g_printerr("%s\n", gerr->message);
+	//g_printerr("%s\n", tmp_err->message);
+	//operation = primary;
+	//g_io_channel_shutdown(chan, FALSE, NULL);
+	//g_io_channel_unref(chan);
+	//chan = NULL;
+g_printerr("%s\n", tmp_err->message);
 
-	g_io_channel_shutdown(chan, FALSE, NULL);
-	g_io_channel_unref(chan);
-	chan = NULL;
 	return 0 ;
 }

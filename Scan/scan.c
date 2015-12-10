@@ -227,6 +227,8 @@ int main(){
 	  {
 
 	  }
+	  
+	  
 setsockopt(sock, SOL_HCI, HCI_FILTER, &old_filter, sizeof(old_filter));
 hci_close_dev(sock);
  
