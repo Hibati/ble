@@ -1,0 +1,2 @@
+handle = 0x000a, char properties = 0x10, char value handle = 0x000b, uuid = 6e400003-b5a3-f393-e0a9-e50e24dcca9e
+handle = 0x000d, char properties = 0x0c, char value handle = 0x000e, uuid = 6e400002-b5a3-f393-e0a9-e50e24dcca9e
